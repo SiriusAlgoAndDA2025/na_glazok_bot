@@ -1,0 +1,15 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.DS_Store
+
+# Keep runtime data mounted from host via docker-compose volume
+# (we still COPY it in Dockerfile, but ignore for faster rebuilds if desired)
+# data
+
+

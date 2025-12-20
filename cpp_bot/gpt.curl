@@ -1,0 +1,13 @@
+curl https://api.aitunnel.ru/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer sk-aitunnel-xxx" \
+    -d '{
+      "model": "deepseek-r1",
+      "max_tokens": 50000,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Скажи интересный факт"
+        }
+      ]
+    }

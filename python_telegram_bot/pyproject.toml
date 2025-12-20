@@ -1,0 +1,72 @@
+[project]
+name = "telegram-bot"
+version = "0.1.0"
+description = "Telegram bot for generating optical illusions"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "aiogram>=3.14.0",
+    "openai>=2.14.0",
+    "python-dotenv>=1.0.0",
+    "aiosqlite>=0.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.14.10",
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+preview = true
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = [
+    "F",
+    "E",
+    "PL",
+    "W",
+    "C",
+    # "PLW0621",  # not working in ruff redefined-outer-name
+    # "PLE0606",  # not working in ruff
+    "T100", # https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
+    "T2", # https://docs.astral.sh/ruff/rules/#flake8-print-t20
+    # "TD", # https://docs.astral.sh/ruff/rules/#flake8-todos-td
+    "UP", # https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "I", # https://docs.astral.sh/ruff/rules/#isort-i
+    "N", # https://docs.astral.sh/ruff/rules/#pep8-naming-n
+    "ARG",
+]
+ignore = [
+    "PLR0911",  # Too many return statements
+    "PLR0914",  # Too many local variables
+    "PLR0912",  # Too many branches
+    "PLE1205",
+    "PLR6301",
+    "PLR0917",  # Too many positional arguments
+    "PLR0913",  # Too many arguments in function definition
+    "PLR1702",  # Too many nested blocks
+    "PLR0915",  # Too many statements
+    "UP042",    # Class ... inherits from both `...` and `...`
+    "UP008",    # Use `super()` instead of `super(__class__, self)`
+    "UP015",    # Unnecessary mode argument
+    "N805",     # First argument of a method should be named `self`
+]
+
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+ unfixable = []
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff.lint.isort]
+known-first-party = ["tests","app","frontend"]
+lines-after-imports = 2
+section-order = ['future', 'standard-library', 'third-party', 'first-party', 'local-folder']
+
+[tool.ruff.format]
+# 5. Use single quotes for non-triple-quoted strings.
+quote-style = "single"

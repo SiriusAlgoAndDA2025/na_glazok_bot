@@ -1,0 +1,20 @@
+# Создание изображения
+curl -s -D >(grep -i x-request-id >&2)   -o >(jq -r '.data[0].b64_json' | base64 --decode > gen_image.png)   -X POST "https://api.aitunnel.ru/v1/images/generations"   -H "Content-Type: application/json"   -H "Authorization: Bearer sk-aitunnel-xxx"   -d '{"model":"gpt-image-1","prompt":"Нарисованный попугай","quality":"medium","size":"1024x1536","moderation":"low","output_format":"png"}'
+
+echo "Generated image saved to gen_image.png"
+
+# Редактирование изображения
+curl -s -D >(grep -i x-request-id >&2) \
+  -o >(jq -r '.data[0].b64_json' | base64 --decode > edit_image.png) \
+  -X POST "https://api.aitunnel.ru/v1/images/edits" \
+  -H "Authorization: Bearer sk-aitunnel-xxx" \
+  -F "model=gpt-image-1" \
+  -F "prompt=Объедини эти картинки в одну" \
+  -F "quality=medium" \
+  -F "size=1024x1536" \
+  -F "moderation=low" \
+  -F "output_format=png" \
+  -F "image[]=@image.png;type=image/png" \
+  -F "image[]=@image_2.png;type=image/png"
+
+echo "Edited image saved to edit_image.png
