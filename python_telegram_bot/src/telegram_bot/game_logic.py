@@ -69,8 +69,9 @@ class GameLogic:
             logger.error(f'[GameLogic] Error initializing database: {e}')
 
     async def _create_tables(self):
-        """Create database tables"""
+        """Create database tables and run migrations"""
         async with aiosqlite.connect(self.db_file) as db:
+            # Create table if not exists
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS user_stats (
                     user_id TEXT PRIMARY KEY,
@@ -79,6 +80,16 @@ class GameLogic:
                     username TEXT DEFAULT ''
                 )
             """)
+
+            # Check if username column exists, if not add it (migration)
+            async with db.execute("PRAGMA table_info(user_stats)") as cursor:
+                columns = await cursor.fetchall()
+                column_names = [col[1] for col in columns]
+
+                if 'username' not in column_names:
+                    logger.info('[GameLogic] Adding username column to user_stats table')
+                    await db.execute("ALTER TABLE user_stats ADD COLUMN username TEXT DEFAULT ''")
+
             await db.commit()
             logger.info('[GameLogic] Database tables created/verified')
 
@@ -141,14 +152,13 @@ class GameLogic:
         self.active_challenges[user_id] = challenge
         logger.info(f'[GameLogic] Challenge started for user {user_id} with answer: {correct_answer}')
 
-    def check_answer(self, user_id: str, user_answer: str, username: str = '') -> bool:
+    def check_answer(self, user_id: str, user_answer: str) -> bool:
         """
         Check a user's answer and remove the challenge.
 
         Args:
             user_id: Telegram user ID
             user_answer: The user's answer ("first", "second", or "equal")
-            username: Telegram username or first name
 
         Returns:
             True if the answer is correct, False otherwise
@@ -160,10 +170,8 @@ class GameLogic:
             is_correct = challenge.correct_answer == user_answer
             logger.info(f'[GameLogic] User {user_id} answer is {"correct" if is_correct else "incorrect"}')
 
-            # Record the answer for statistics
-            self.record_answer(user_id, is_correct, username)
-
             # Remove the challenge after checking
+            # Note: Don't record answer here - let the bot handle it with username
             del self.active_challenges[user_id]
             return is_correct
 
@@ -188,9 +196,10 @@ class GameLogic:
         if is_correct:
             self.user_stats[user_id].correct_answers += 1
 
-        # Update username if provided
+        # Always update username if provided (overwrite old username or empty string)
         if username:
             self.user_stats[user_id].username = username
+            logger.info(f'[GameLogic] Updated username for user {user_id} to: {username}')
 
         logger.info(f'[GameLogic] Updated stats for user {user_id}: {self.user_stats[user_id]}')
 

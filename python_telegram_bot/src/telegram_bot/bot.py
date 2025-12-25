@@ -341,11 +341,12 @@ class TelegramBot:
             await self.bot.send_message(chat_id, 'Эта задача уже была решена или истекло время.')
             return
 
-        # Check the answer with username (check_answer calls record_answer internally)
-        # Use chat_id for challenge lookup, user_id for stats
+        # Check the answer (only validates, doesn't record stats)
+        # Use chat_id for challenge lookup
         is_correct = self.game_logic.check_answer(chat_id, callback_data)
 
-        # Record the answer for user statistics (challenges use chat_id, stats use user_id)
+        # Record the answer for user statistics with username
+        # Use user_id for stats (not chat_id) to track individual users
         self.game_logic.record_answer(user_id, is_correct, username)
 
         # Remove the buttons from the message
