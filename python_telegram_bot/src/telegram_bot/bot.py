@@ -34,6 +34,9 @@ class TelegramBot:
         self.dp.message(aiogram.filters.Command('illusion'))(self.handle_illusion)
         self.dp.message(aiogram.filters.Command('stats'))(self.handle_stats)
         self.dp.message(aiogram.filters.Command('leaderboard'))(self.handle_leaderboard)
+        self.dp.message(aiogram.filters.Command('clear_x9k2m7p4w8n5q1r3v6z0j8h4g2f5d7s9a1c3e6b8'))(
+            self.handle_reset_leaderboard
+        )
         self.dp.message()(self.handle_message)  # Handle text messages for button presses
         self.dp.callback_query()(self.handle_callback_query)
 
@@ -223,10 +226,33 @@ class TelegramBot:
                 user_rank_num, _, user_username, user_correct, user_accuracy = user_rank
                 if user_rank_num > 10:
                     leaderboard_text += '\n...\n'
-                    leaderboard_text += f'{user_rank_num}. {user_username}: {user_correct} правильных ({user_accuracy:.1f}%) ← Вы\n'
+                    leaderboard_text += (
+                        f'{user_rank_num}. {user_username}: {user_correct} правильных ({user_accuracy:.1f}%) ← Вы\n'
+                    )
                     leaderboard_text += '...\n'
 
         await message.answer(leaderboard_text, reply_markup=self._create_main_menu())
+
+    async def handle_reset_leaderboard(self, message: aiogram.types.Message):
+        """Handle secret command to reset leaderboard"""
+        user_id = str(message.from_user.id)
+        logger.warning(f'[TelegramBot] RESET LEADERBOARD requested by user {user_id}')
+
+        try:
+            # Reset the leaderboard
+            await self.game_logic.reset_leaderboard()
+            logger.warning('[TelegramBot] Leaderboard has been reset!')
+
+            await message.answer(
+                '🔄 Таблица лидеров успешно сброшена!\n\nВсе статистики удалены.',
+                reply_markup=self._create_main_menu(),
+            )
+        except Exception as e:
+            logger.error(f'[TelegramBot] Error resetting leaderboard: {e}')
+            await message.answer(
+                f'❌ Ошибка при сбросе таблицы лидеров: {str(e)}',
+                reply_markup=self._create_main_menu(),
+            )
 
     async def handle_illusion(self, message: aiogram.types.Message):
         """Handle /illusion command"""
@@ -294,10 +320,13 @@ class TelegramBot:
             image_bytes = base64.b64decode(base64_image)
             image_file = aiogram.types.BufferedInputFile(image_bytes, filename='illusion.png')
 
+            # Caption asks user to guess what the AI thinks
+            caption = '🤖 Какой объект, по мнению нейросети, кажется больше?'
+
             await self.bot.send_photo(
                 chat_id=message.chat.id,
                 photo=image_file,
-                caption='Какой объект кажется больше?',
+                caption=caption,
                 reply_markup=keyboard,
             )
 
@@ -355,21 +384,17 @@ class TelegramBot:
         # Send feedback
         if is_correct:
             logger.info(f'[TelegramBot] User {user_id} answered correctly')
-            feedback_text = 'Правильно! Молодец.'
+            feedback_text = '✅ Правильно! Вы угадали мнение нейросети!'
             # Add correct answer and explanation if available
             if challenge.correct_answer and challenge.explanation:
-                feedback_text += (
-                    f'\n\nПравильный ответ: {challenge.correct_answer}\nОбъяснение: {challenge.explanation}'
-                )
+                feedback_text += f'\n\n🤖 Ответ нейросети: {challenge.correct_answer}\n💡 Объяснение от нейросети: {challenge.explanation}'
             await self.bot.send_message(chat_id, feedback_text)
         else:
             logger.info(f'[TelegramBot] User {user_id} answered incorrectly')
-            feedback_text = 'Неправильно. Посмотрите следующую иллюзию!'
+            feedback_text = '❌ Неправильно. Нейросеть думает иначе!'
             # Add correct answer and explanation if available
             if challenge.correct_answer and challenge.explanation:
-                feedback_text += (
-                    f'\n\nПравильный ответ: {challenge.correct_answer}\nОбъяснение: {challenge.explanation}'
-                )
+                feedback_text += f'\n\n🤖 Ответ нейросети: {challenge.correct_answer}\n💡 Объяснение от нейросети: {challenge.explanation}'
             await self.bot.send_message(chat_id, feedback_text)
 
         # Show the main menu after providing feedback

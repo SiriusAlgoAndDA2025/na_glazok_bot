@@ -1,15 +1,36 @@
+import asyncio
 import logging
 import os
-import aiosqlite
-import asyncio
-import typing
-from typing import Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+import aiosqlite
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class DatabaseConnection:
+    """Async context manager for thread-safe database connections."""
+
+    def __init__(self, db_file: str, lock: asyncio.Lock):
+        self.db_file = db_file
+        self.lock = lock
+        self.db = None
+
+    async def __aenter__(self):
+        """Acquire lock and open database connection."""
+        await self.lock.acquire()
+        self.db = await aiosqlite.connect(self.db_file)
+        return self.db
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Close database connection and release lock."""
+        if self.db:
+            await self.db.close()
+        self.lock.release()
+        return False
 
 
 @dataclass
@@ -37,11 +58,12 @@ class GameLogic:
     """Manages game state and challenges for the optical illusion bot."""
 
     def __init__(self, data_dir: str = 'data'):
-        self.active_challenges: Dict[str, Challenge] = {}
-        self.user_stats: Dict[str, UserStats] = {}
+        self.active_challenges: dict[str, Challenge] = {}
+        self.user_stats: dict[str, UserStats] = {}
         self.challenge_timeout = timedelta(minutes=10)
         self.data_dir = data_dir
         self.db_file = os.path.join(data_dir, 'user_stats.db')
+        self._db_lock = asyncio.Lock()  # Database lock for thread-safe operations
 
         # Create data directory if it doesn't exist
         os.makedirs(data_dir, exist_ok=True)
@@ -70,7 +92,7 @@ class GameLogic:
 
     async def _create_tables(self):
         """Create database tables and run migrations"""
-        async with aiosqlite.connect(self.db_file) as db:
+        async with DatabaseConnection(self.db_file, self._db_lock) as db:
             # Create table if not exists
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS user_stats (
@@ -82,7 +104,7 @@ class GameLogic:
             """)
 
             # Check if username column exists, if not add it (migration)
-            async with db.execute("PRAGMA table_info(user_stats)") as cursor:
+            async with db.execute('PRAGMA table_info(user_stats)') as cursor:
                 columns = await cursor.fetchall()
                 column_names = [col[1] for col in columns]
 
@@ -95,27 +117,22 @@ class GameLogic:
 
     async def _save_stats(self, user_id: str):
         """Save user statistics to database"""
-        # Create a lock for database writes
-        if not hasattr(self, '_db_lock'):
-            self._db_lock = asyncio.Lock()
-
         try:
-            async with self._db_lock:
-                async with aiosqlite.connect(self.db_file) as db:
-                    # Use INSERT OR REPLACE to handle both new and existing users
-                    await db.execute(
-                        """
-                        INSERT OR REPLACE INTO user_stats (user_id, total_challenges, correct_answers, username)
-                        VALUES (?, ?, ?, ?)
-                    """,
-                        (
-                            user_id,
-                            self.user_stats[user_id].total_challenges,
-                            self.user_stats[user_id].correct_answers,
-                            self.user_stats[user_id].username,
-                        ),
-                    )
-                    await db.commit()
+            async with DatabaseConnection(self.db_file, self._db_lock) as db:
+                # Use INSERT OR REPLACE to handle both new and existing users
+                await db.execute(
+                    """
+                    INSERT OR REPLACE INTO user_stats (user_id, total_challenges, correct_answers, username)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (
+                        user_id,
+                        self.user_stats[user_id].total_challenges,
+                        self.user_stats[user_id].correct_answers,
+                        self.user_stats[user_id].username,
+                    ),
+                )
+                await db.commit()
             logger.info(f'[GameLogic] Saved stats for user {user_id}')
         except Exception as e:
             logger.error(f'[GameLogic] Error saving stats for user {user_id}: {e}')
@@ -233,7 +250,7 @@ class GameLogic:
 
         # If not in memory, try to load from database
         try:
-            async with aiosqlite.connect(self.db_file) as db:
+            async with DatabaseConnection(self.db_file, self._db_lock) as db:
                 async with db.execute(
                     """
                     SELECT total_challenges, correct_answers, username
@@ -257,7 +274,7 @@ class GameLogic:
         # If no stats found, return default
         return UserStats()
 
-    def get_active_challenge(self, user_id: str) -> Optional[Challenge]:
+    def get_active_challenge(self, user_id: str) -> Challenge | None:
         """
         Get the active challenge for a user without removing it.
 
@@ -314,7 +331,7 @@ class GameLogic:
 
         return expired
 
-    async def get_leaderboard(self, user_id: str, limit: int = 10) -> typing.Dict:
+    async def get_leaderboard(self, user_id: str, limit: int = 10) -> dict:
         """
         Get leaderboard with top users and current user's position.
 
@@ -327,7 +344,7 @@ class GameLogic:
             and 'user_rank' (tuple: rank, user_id, username, score, accuracy) or None
         """
         try:
-            async with aiosqlite.connect(self.db_file) as db:
+            async with DatabaseConnection(self.db_file, self._db_lock) as db:
                 # Get top users ordered by correct answers descending
                 top_users = []
                 async with db.execute(
@@ -388,3 +405,23 @@ class GameLogic:
         except Exception as e:
             logger.error(f'[GameLogic] Error getting leaderboard: {e}')
             return {'top_users': [], 'user_rank': None}
+
+    async def reset_leaderboard(self) -> None:
+        """
+        Reset the entire leaderboard - delete all user statistics.
+        This is a destructive operation that cannot be undone.
+        """
+        try:
+            async with DatabaseConnection(self.db_file, self._db_lock) as db:
+                # Delete all records from user_stats table
+                await db.execute('DELETE FROM user_stats')
+                await db.commit()
+                logger.warning('[GameLogic] All user statistics have been deleted from database')
+
+            # Clear in-memory cache
+            self.user_stats.clear()
+            logger.warning('[GameLogic] In-memory user stats cache cleared')
+
+        except Exception as e:
+            logger.error(f'[GameLogic] Error resetting leaderboard: {e}')
+            raise
