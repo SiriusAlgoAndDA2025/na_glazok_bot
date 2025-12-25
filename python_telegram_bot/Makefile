@@ -64,11 +64,12 @@ deploy:
 		--exclude="./python_telegram_bot/.ruff_cache" \
 		--exclude="./python_telegram_bot/.mypy_cache" \
 		--exclude="*.DS_Store" \
+		--exclude="./python_telegram_bot/.env" \
 		--exclude="./python_telegram_bot/data/user_stats.db" \
 		-C .. docker-compose.yml python_telegram_bot; \
 	ssh -p "$$SSH_PORT" "$$SSH_USERNAME@$$SSH_HOST" "mkdir -p $(REMOTE_DIR)"; \
 	scp -P "$$SSH_PORT" "$(ARCHIVE_NAME)" "$$SSH_USERNAME@$$SSH_HOST:$(REMOTE_DIR)/$(ARCHIVE_NAME)"; \
-	ssh -p "$$SSH_PORT" "$$SSH_USERNAME@$$SSH_HOST" "cd $(REMOTE_DIR) && tar -xzf $(ARCHIVE_NAME) && rm -f $(ARCHIVE_NAME)"; \
+	ssh -p "$$SSH_PORT" "$$SSH_USERNAME@$$SSH_HOST" "cd $(REMOTE_DIR) && tar -xzf $(ARCHIVE_NAME) && rm -f $(ARCHIVE_NAME) && docker compose up --build -d"; \
 	rm -f "$(ARCHIVE_NAME)"
 
 connect:
