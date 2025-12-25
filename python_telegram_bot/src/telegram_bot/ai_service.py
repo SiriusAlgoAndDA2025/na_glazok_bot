@@ -74,27 +74,27 @@ class AIService:
                 messages=[
                     {
                         'role': 'user',
-                        'content': f'''Create an optical illusion prompt for image generation with two objects (circles, squares, or rectangles) positioned side by side. The correct answer must be: {correct_answer} ({answer_description} by actual pixel size).
+                        'content': f'''Create an optical illusion prompt for image generation with two objects (circles, squares, or rectangles) positioned side by side. The correct answer must be: {correct_answer} ({answer_description}).
 
 CRITICAL RULES:
-1. The correct answer MUST reflect the ACTUAL pixel size of the objects, not how they appear
-2. Design the illusion so the actual size matches "{correct_answer}" but may APPEAR different due to visual tricks
+1. The correct answer MUST reflect the ACTUAL physical size if you measure the objects with a ruler on the computer screen
+2. Design the illusion so the real measured size matches "{correct_answer}" but may APPEAR different to the eye due to visual tricks
 3. Use context, surroundings, perspective, or patterns to create the illusion
 
 Guidelines by answer type:
-- If "left": Make the left object ACTUALLY larger in pixels, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
-- If "right": Make the right object ACTUALLY larger in pixels, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
-- If "equal": Make both objects EXACTLY the same pixel size, but use ASYMMETRIC surroundings that might make one appear larger (e.g., left surrounded by small circles, right by large circles - Ebbinghaus illusion)
+- If "left": Make the left object ACTUALLY larger if measured with a ruler, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
+- If "right": Make the right object ACTUALLY larger if measured with a ruler, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
+- If "equal": Make both objects EXACTLY the same size when measured with a ruler, but use ASYMMETRIC surroundings that might make one appear larger (e.g., left surrounded by small circles, right by large circles - Ebbinghaus illusion)
 
 Examples:
-1. correct_answer="left": "Two circles side by side. The left circle is 20% larger in diameter. The left circle is surrounded by very large circles (2x its size) making it appear smaller. The right circle is surrounded by tiny circles (0.3x its size) making it appear larger. Clean white background."
-2. correct_answer="right": "Two horizontal rectangles. The right rectangle is 15% longer. Apply Ponzo illusion: draw converging lines in the background creating forced perspective, with the right rectangle placed in the 'distant' narrow part and left in the 'near' wide part, making the right appear smaller despite being larger."
-3. correct_answer="equal": "Two identical circles (same diameter). Left circle surrounded by 6 large circles (2x diameter). Right circle surrounded by 6 small circles (0.5x diameter). This is the Ebbinghaus illusion - the right will appear larger but they are equal."
+1. correct_answer="left": "Two circles side by side. The left circle is 20% larger in diameter when measured. The left circle is surrounded by very large circles (2x its size) making it appear smaller. The right circle is surrounded by tiny circles (0.3x its size) making it appear larger. Clean white background."
+2. correct_answer="right": "Two horizontal rectangles. The right rectangle is 15% longer when measured. Apply Ponzo illusion: draw converging lines in the background creating forced perspective, with the right rectangle placed in the 'distant' narrow part and left in the 'near' wide part, making the right appear smaller despite being larger."
+3. correct_answer="equal": "Two identical circles (same diameter when measured). Left circle surrounded by 6 large circles (2x diameter). Right circle surrounded by 6 small circles (0.5x diameter). This is the Ebbinghaus illusion - the right will appear larger but they are equal."
 
 Respond ONLY with valid JSON in this exact format:
-{{"prompt": "detailed prompt for image generator describing exact sizes and visual context", "explanation": "brief explanation in Russian why the actual size is {correct_answer} and how the illusion might make it appear different"}}
+{{"prompt": "detailed prompt for image generator describing exact sizes and visual context", "explanation": "brief explanation in Russian describing the illusion and what is the true answer when measured with a ruler"}}
 
-Remember: The explanation should clarify the TRUE size and describe the illusion effect.''',
+Remember: The explanation should clarify what happens when you measure with a ruler and how the illusion deceives the eye.''',
                     }
                 ],
                 model=self.prompt_model,

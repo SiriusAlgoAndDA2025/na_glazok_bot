@@ -334,13 +334,6 @@ class TelegramBot:
             await status_message.delete()
             logger.info('[TelegramBot] Finished sending illusion challenge with buttons')
 
-            # Send a message with the main menu
-            await self.bot.send_message(
-                chat_id=message.chat.id,
-                text='Используйте меню ниже для дополнительных опций:',
-                reply_markup=self._create_main_menu(),
-            )
-
         except Exception as e:
             logger.error(f'[TelegramBot] Error generating illusion: {str(e)}')
             await message.answer(
@@ -396,13 +389,6 @@ class TelegramBot:
             if challenge.correct_answer and challenge.explanation:
                 feedback_text += f'\n\n🤖 Ответ нейросети: {challenge.correct_answer}\n💡 Объяснение от нейросети: {challenge.explanation}'
             await self.bot.send_message(chat_id, feedback_text)
-
-        # Show the main menu after providing feedback
-        await self.bot.send_message(
-            chat_id=chat_id,
-            text='Используйте меню ниже для дополнительных опций:',
-            reply_markup=self._create_main_menu(),
-        )
 
     async def start(self):
         """Start the bot"""
