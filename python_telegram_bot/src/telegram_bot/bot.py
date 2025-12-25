@@ -33,6 +33,7 @@ class TelegramBot:
         self.dp.message(aiogram.filters.Command('help'))(self.handle_help)
         self.dp.message(aiogram.filters.Command('illusion'))(self.handle_illusion)
         self.dp.message(aiogram.filters.Command('stats'))(self.handle_stats)
+        self.dp.message(aiogram.filters.Command('leaderboard'))(self.handle_leaderboard)
         self.dp.message()(self.handle_message)  # Handle text messages for button presses
         self.dp.callback_query()(self.handle_callback_query)
 
@@ -68,6 +69,7 @@ class TelegramBot:
             [aiogram.types.KeyboardButton(text='🔮 Сгенерировать иллюзию')],
             [aiogram.types.KeyboardButton(text='🎲 Случайная иллюзия')],
             [aiogram.types.KeyboardButton(text='📊 Просмотр статистики')],
+            [aiogram.types.KeyboardButton(text='🏆 Таблица лидеров')],
             [aiogram.types.KeyboardButton(text='ℹ️ Помощь')],
         ]
         return aiogram.types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, one_time_keyboard=False)
@@ -91,6 +93,7 @@ class TelegramBot:
             '🔮 Сгенерировать иллюзию - Создать новую задачу по оптической иллюзии\n'
             '🎲 Случайная иллюзия - Показать случайную иллюзию из коллекции\n'
             '📊 Просмотр статистики - Показать вашу статистику\n'
+            '🏆 Таблица лидеров - Показать топ-10 участников\n'
             'ℹ️ Помощь - Показать это сообщение помощи\n\n'
             'Просто используйте кнопки ниже для навигации!'
         )
@@ -110,6 +113,9 @@ class TelegramBot:
         elif message.text == '📊 Просмотр статистики':
             # Call the stats handler
             await self.handle_stats(message)
+        elif message.text == '🏆 Таблица лидеров':
+            # Call the leaderboard handler
+            await self.handle_leaderboard(message)
         elif message.text == 'ℹ️ Помощь':
             # Call the help handler
             await self.handle_help(message)
@@ -182,6 +188,45 @@ class TelegramBot:
             )
 
         await message.answer(stats_text, reply_markup=self._create_main_menu())
+
+    async def handle_leaderboard(self, message: aiogram.types.Message):
+        """Handle /leaderboard command"""
+        user_id = str(message.from_user.id)
+        logger.info(f'[TelegramBot] Received /leaderboard from user {user_id}')
+
+        # Get leaderboard data
+        leaderboard_data = await self.game_logic.get_leaderboard(user_id, limit=10)
+        top_users = leaderboard_data['top_users']
+        user_rank = leaderboard_data['user_rank']
+
+        # Build leaderboard message
+        if not top_users:
+            leaderboard_text = 'Таблица лидеров пока пуста. Будьте первым, кто решит задачи! 🏆'
+        else:
+            leaderboard_text = '🏆 Таблица лидеров (Топ-10):\n\n'
+
+            for rank, user_id_db, username, correct_answers, accuracy in top_users:
+                # Use medal emojis for top 3
+                if rank == 1:
+                    prefix = '🥇'
+                elif rank == 2:
+                    prefix = '🥈'
+                elif rank == 3:
+                    prefix = '🥉'
+                else:
+                    prefix = f'{rank}.'
+
+                leaderboard_text += f'{prefix} {username}: {correct_answers} правильных ({accuracy:.1f}%)\n'
+
+            # Show user's position if not in top 10
+            if user_rank:
+                user_rank_num, _, user_username, user_correct, user_accuracy = user_rank
+                if user_rank_num > 10:
+                    leaderboard_text += '\n...\n'
+                    leaderboard_text += f'{user_rank_num}. {user_username}: {user_correct} правильных ({user_accuracy:.1f}%) ← Вы\n'
+                    leaderboard_text += '...\n'
+
+        await message.answer(leaderboard_text, reply_markup=self._create_main_menu())
 
     async def handle_illusion(self, message: aiogram.types.Message):
         """Handle /illusion command"""
@@ -281,6 +326,9 @@ class TelegramBot:
 
         logger.info(f'[TelegramBot] Received callback from user {user_id}: {callback_data}')
 
+        # Get username or first name for display
+        username = callback_query.from_user.username or callback_query.from_user.first_name or 'Anonymous'
+
         # Answer the callback query to remove the loading indicator
         await callback_query.answer()
 
@@ -293,8 +341,12 @@ class TelegramBot:
             await self.bot.send_message(chat_id, 'Эта задача уже была решена или истекло время.')
             return
 
-        # Check the answer
+        # Check the answer with username (check_answer calls record_answer internally)
+        # Use chat_id for challenge lookup, user_id for stats
         is_correct = self.game_logic.check_answer(chat_id, callback_data)
+
+        # Record the answer for user statistics (challenges use chat_id, stats use user_id)
+        self.game_logic.record_answer(user_id, is_correct, username)
 
         # Remove the buttons from the message
         await callback_query.message.edit_reply_markup(reply_markup=None)

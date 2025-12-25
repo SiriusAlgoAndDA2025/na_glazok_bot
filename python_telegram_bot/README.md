@@ -8,7 +8,10 @@ This Telegram bot generates optical illusion images with two objects and asks us
 - Three answer options: "First is larger", "Second is larger", "They are equal"
 - Immediate feedback on user responses
 - User-friendly menu interface with buttons
-- Persistent user statistics saved to disk
+- Persistent user statistics saved to disk with SQLite database
+- Leaderboard system showing top 10 players ranked by correct answers
+- Display user's position if outside top 10
+- Tracks username/first name for leaderboard display
 - Random illusion gallery from user-maintained collection
 - Preserves existing functionality including `/image_url` command
 
@@ -18,6 +21,7 @@ This Telegram bot generates optical illusion images with two objects and asks us
 - `/help` - Show available commands and help information
 - `/illusion` - Generate a new optical illusion challenge
 - `/stats` - View your statistics
+- `/leaderboard` - View the top 10 players and your ranking
 - `/image_url` - Send a sample image (existing functionality preserved)
 
 ## Menu Options
@@ -25,6 +29,7 @@ This Telegram bot generates optical illusion images with two objects and asks us
 - 🔮 Generate Illusion - Create a new optical illusion challenge
 - 🎲 Random Illusion - Get a random illusion from our collection
 - 📊 View Statistics - Show your performance stats
+- 🏆 Leaderboard - View top 10 players and your ranking
 - ℹ️ Help - Show help information
 
 ## Implementation Details
@@ -39,13 +44,16 @@ This Telegram bot generates optical illusion images with two objects and asks us
    - Tracks active challenges for users
    - Validates user answers
    - Handles challenge timeouts
-   - Saves/loads user statistics to/from disk in the `data/` directory
+   - Saves/loads user statistics to/from SQLite database in the `data/` directory
+   - Provides leaderboard functionality with ranking by correct answers
+   - Stores and retrieves user display names (username or first name)
 
 3. **TelegramBot** - Main bot implementation
-   - Processes user commands
+   - Processes user commands including `/leaderboard`
    - Sends images with interactive buttons
-   - Handles user responses
+   - Handles user responses and records answers with usernames
    - Manages random illusion gallery from `data/illusion_urls.txt`
+   - Displays formatted leaderboard with medals for top 3 players
 
 ### AI Integration
 
@@ -91,6 +99,7 @@ The bot integrates with aitunnel.ru APIs:
 4. Alternatively, you can use the traditional commands:
    - `/illusion` - Generate a new optical illusion challenge
    - `/stats` - View your statistics
+   - `/leaderboard` - View the top 10 players leaderboard
    - `/help` - Show help information
 
 ## Makefile Commands

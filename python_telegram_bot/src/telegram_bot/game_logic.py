@@ -2,6 +2,7 @@ import logging
 import os
 import aiosqlite
 import asyncio
+import typing
 from typing import Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -140,13 +141,14 @@ class GameLogic:
         self.active_challenges[user_id] = challenge
         logger.info(f'[GameLogic] Challenge started for user {user_id} with answer: {correct_answer}')
 
-    def check_answer(self, user_id: str, user_answer: str) -> bool:
+    def check_answer(self, user_id: str, user_answer: str, username: str = '') -> bool:
         """
         Check a user's answer and remove the challenge.
 
         Args:
             user_id: Telegram user ID
             user_answer: The user's answer ("first", "second", or "equal")
+            username: Telegram username or first name
 
         Returns:
             True if the answer is correct, False otherwise
@@ -159,7 +161,7 @@ class GameLogic:
             logger.info(f'[GameLogic] User {user_id} answer is {"correct" if is_correct else "incorrect"}')
 
             # Record the answer for statistics
-            self.record_answer(user_id, is_correct)
+            self.record_answer(user_id, is_correct, username)
 
             # Remove the challenge after checking
             del self.active_challenges[user_id]
@@ -168,13 +170,14 @@ class GameLogic:
         logger.info(f'[GameLogic] No active challenge found for user {user_id}')
         return False
 
-    def record_answer(self, user_id: str, is_correct: bool) -> None:
+    def record_answer(self, user_id: str, is_correct: bool, username: str = '') -> None:
         """
         Record a user's answer for statistics.
 
         Args:
             user_id: Telegram user ID
             is_correct: Whether the answer was correct
+            username: Telegram username or first name
         """
         # Initialize user stats if not exists
         if user_id not in self.user_stats:
@@ -184,6 +187,10 @@ class GameLogic:
         self.user_stats[user_id].total_challenges += 1
         if is_correct:
             self.user_stats[user_id].correct_answers += 1
+
+        # Update username if provided
+        if username:
+            self.user_stats[user_id].username = username
 
         logger.info(f'[GameLogic] Updated stats for user {user_id}: {self.user_stats[user_id]}')
 
@@ -297,3 +304,78 @@ class GameLogic:
             logger.info(f'[GameLogic] Challenge expired, created {duration.total_seconds() / 60:.1f} minutes ago')
 
         return expired
+
+    async def get_leaderboard(self, user_id: str, limit: int = 10) -> typing.Dict:
+        """
+        Get leaderboard with top users and current user's position.
+
+        Args:
+            user_id: Current user's Telegram user ID
+            limit: Number of top users to retrieve (default: 10)
+
+        Returns:
+            Dictionary with 'top_users' (list of tuples: rank, user_id, username, score, accuracy)
+            and 'user_rank' (tuple: rank, user_id, username, score, accuracy) or None
+        """
+        try:
+            async with aiosqlite.connect(self.db_file) as db:
+                # Get top users ordered by correct answers descending
+                top_users = []
+                async with db.execute(
+                    """
+                    SELECT user_id, username, total_challenges, correct_answers
+                    FROM user_stats
+                    WHERE total_challenges > 0
+                    ORDER BY correct_answers DESC, total_challenges ASC
+                    LIMIT ?
+                """,
+                    (limit,),
+                ) as cursor:
+                    rank = 1
+                    async for row in cursor:
+                        user_id_db, username, total_challenges, correct_answers = row
+                        accuracy = (correct_answers / total_challenges * 100) if total_challenges > 0 else 0
+                        top_users.append((rank, user_id_db, username or 'Anonymous', correct_answers, accuracy))
+                        rank += 1
+
+                # Get current user's rank
+                user_rank = None
+                if user_id:
+                    # Get user's stats
+                    async with db.execute(
+                        """
+                        SELECT total_challenges, correct_answers, username
+                        FROM user_stats
+                        WHERE user_id = ?
+                    """,
+                        (user_id,),
+                    ) as cursor:
+                        user_row = await cursor.fetchone()
+
+                    if user_row and user_row[0] > 0:  # If user has completed challenges
+                        total_challenges, correct_answers, username = user_row
+                        accuracy = (correct_answers / total_challenges * 100) if total_challenges > 0 else 0
+
+                        # Get user's rank
+                        async with db.execute(
+                            """
+                            SELECT COUNT(*) + 1
+                            FROM user_stats
+                            WHERE total_challenges > 0 AND (
+                                correct_answers > ? OR
+                                (correct_answers = ? AND total_challenges < ?)
+                            )
+                        """,
+                            (correct_answers, correct_answers, total_challenges),
+                        ) as cursor:
+                            rank_row = await cursor.fetchone()
+                            rank = rank_row[0] if rank_row else 1
+
+                        user_rank = (rank, user_id, username or 'Anonymous', correct_answers, accuracy)
+
+                logger.info(f'[GameLogic] Retrieved leaderboard: {len(top_users)} top users')
+                return {'top_users': top_users, 'user_rank': user_rank}
+
+        except Exception as e:
+            logger.error(f'[GameLogic] Error getting leaderboard: {e}')
+            return {'top_users': [], 'user_rank': None}
