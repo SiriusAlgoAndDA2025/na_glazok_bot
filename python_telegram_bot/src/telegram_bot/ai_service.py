@@ -74,7 +74,27 @@ class AIService:
                 messages=[
                     {
                         'role': 'user',
-                        'content': f'Create one optical illusion prompt with two objects where one appears larger than the other. The correct answer is \'{correct_answer}\' - this means: {answer_description}. They might be the same size but appear different due to context, or they might actually be different sizes. Respond with the prompt for image generation and a brief explanation in Russian of how the illusion works in JSON format like this: {{"prompt": "prompt text", "explanation": "brief explanation in Russian"}}. CRITICALLY IMPORTANT: The illusion must be designed so that the correct answer is true by actual pixel size, not just appearance. Examples: 1. Two central circles, left is larger and surrounded by smaller circles making it appear even larger (correct: left, explanation: left circle is actually larger and context enhances the difference). 2. Two rectangles, right is larger but with diverging lines making it appear smaller (correct: right, explanation: right rectangle is actually larger but perspective makes it appear smaller). 3. Two identical squares with symmetric surroundings (correct: equal, explanation: they are actually equal and appear equal).',
+                        'content': f'''Create an optical illusion prompt for image generation with two objects (circles, squares, or rectangles) positioned side by side. The correct answer must be: {correct_answer} ({answer_description} by actual pixel size).
+
+CRITICAL RULES:
+1. The correct answer MUST reflect the ACTUAL pixel size of the objects, not how they appear
+2. Design the illusion so the actual size matches "{correct_answer}" but may APPEAR different due to visual tricks
+3. Use context, surroundings, perspective, or patterns to create the illusion
+
+Guidelines by answer type:
+- If "left": Make the left object ACTUALLY larger in pixels, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
+- If "right": Make the right object ACTUALLY larger in pixels, but use visual context that might make it appear smaller or equal (e.g., surrounded by large objects, distant perspective, compressing patterns)
+- If "equal": Make both objects EXACTLY the same pixel size, but use ASYMMETRIC surroundings that might make one appear larger (e.g., left surrounded by small circles, right by large circles - Ebbinghaus illusion)
+
+Examples:
+1. correct_answer="left": "Two circles side by side. The left circle is 20% larger in diameter. The left circle is surrounded by very large circles (2x its size) making it appear smaller. The right circle is surrounded by tiny circles (0.3x its size) making it appear larger. Clean white background."
+2. correct_answer="right": "Two horizontal rectangles. The right rectangle is 15% longer. Apply Ponzo illusion: draw converging lines in the background creating forced perspective, with the right rectangle placed in the 'distant' narrow part and left in the 'near' wide part, making the right appear smaller despite being larger."
+3. correct_answer="equal": "Two identical circles (same diameter). Left circle surrounded by 6 large circles (2x diameter). Right circle surrounded by 6 small circles (0.5x diameter). This is the Ebbinghaus illusion - the right will appear larger but they are equal."
+
+Respond ONLY with valid JSON in this exact format:
+{{"prompt": "detailed prompt for image generator describing exact sizes and visual context", "explanation": "brief explanation in Russian why the actual size is {correct_answer} and how the illusion might make it appear different"}}
+
+Remember: The explanation should clarify the TRUE size and describe the illusion effect.''',
                     }
                 ],
                 model=self.prompt_model,
